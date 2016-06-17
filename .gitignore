@@ -1,0 +1,11 @@
+build
+
+.vagrant
+
+*.out
+*.err
+*.gz
+*.tar
+.DS_Store
+
+*.*~
