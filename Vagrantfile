@@ -74,9 +74,32 @@ EOF
 export SPARK_HOME=$SPARK_HOME
 EOF
 
+    #set log levels
+    cp /usr/spark/default/conf/log4j.properties.template /usr/spark/default/conf/log4j.properties
+    sed -i 's/INFO/ERROR/g' /usr/spark/default/conf/log4j.properties
+
+    #install executeable files
+    for each in $(find /usr/spark/default/bin/ -executable -type f) ; do
+      name=$(basename $each)
+      alternatives --install "/usr/bin/$name" "$name" "$each" 99999
+    done
+
+
   else
     echo -e "\e[7;44;96m*spark-1.6.1 already appears to be installed. skipping."
   fi
+
+  #course material
+  if [ ! -d ml-100k ]; then
+    curl -O http://files.grouplens.org/datasets/movielens/ml-100k.zip \
+    && unzip ml-100k.zip \
+    && rm -f ml-100k.zip
+  fi
+
+  if [ ! -f ratings-counter.py ]; then
+    curl -O https://raw.githubusercontent.com/minimav/udemy_spark/master/ratings-counter.py
+  fi
+
 
 
   #set hostname
