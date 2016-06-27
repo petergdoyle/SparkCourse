@@ -12,3 +12,5 @@ ml-100k/
 .idea/
 *.csv
 *.txt
+*.data
+*.zip
