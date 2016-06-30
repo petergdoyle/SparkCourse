@@ -299,3 +299,95 @@ your:   	1420
 to:		 1828
 you:		1878
 ```
+
+
+####24. [Activity] Find the Most Popular Superhero in a Social Graph
+#####Superheros Datasets
+The first dataset contains the id of each superhero and the associated superhero ids that that have appared together. By finding the superhero with the most number of associations (or appearances with other superheros) then we find the "most popular" superhero. The first dataset contains the association graph for each superhero. Superheros may appear in multiple lines (start with the same superhero id) so we must count the associations both within and between the graph lines (ie project and total for each line starting with the same heroId) 
+The dataset is contained in the Marvel-graph.txt file.
+```
+5988 748 1722 3752 4655 5743 1872 3413 5527 6368 6085 4319 4728 1636 2397 3364 4001 1614 1819 1585 732 2660 3952 2507 3891 2070 2239 2602 612 1352 5447 4548 1596 5488 1605 5517 11 479 2554 2043 17 865 4292 6312 473 534 1479 6375 4456 
+5989 4080 4264 4446 3779 2430 2297 6169 3530 3272 4282 6432 2548 4140 185 105 3878 2429 1334 4595 2767 3956 3877 4776 4946 3407 128 269 5775 5121 481 5516 4758 4053 1044 1602 3889 1535 6038 533 3986 
+...
+```
+the second dataset contains the database of names for the superhero keyed on the superhero id. Marvel-Names.txt
+```
+1 "24-HOUR MAN/EMMANUEL"
+2 "3-D MAN/CHARLES CHAN"
+3 "4-D MAN/MERCURIO"
+4 "8-BALL/"
+5 "A"
+6 "A'YIN"
+7 "ABBOTT, JACK"
+8 "ABCISSA"
+```
+the program: Most-Popular-Superhero.py
+```python
+      1 from pyspark import SparkConf, SparkContext
+      2 
+      3 conf = SparkConf().setMaster("local").setAppName("PopularHero")
+      4 sc = SparkContext(conf = conf)
+      5 
+      6 def countCoOccurences(line):
+      7     elements = line.split()
+      8     return (int(elements[0]), len(elements) - 1)
+      9 
+     10 def parseNames(line):
+     11     fields = line.split('\"')
+     12     return (int(fields[0]), fields[1].encode("utf8"))
+     13 
+     14 names = sc.textFile("/vagrant/marvel-names.txt")
+     15 namesRdd = names.map(parseNames)
+     16 
+     17 lines = sc.textFile("/vagrant/marvel-graph-sm.txt")
+     18 
+     19 pairings = lines.map(countCoOccurences)
+     20 
+     21 totalFriendsByCharacter = pairings.reduceByKey(lambda x, y : x + y)
+     22 
+     23 flipped = totalFriendsByCharacter.map(lambda (x,y) : (y,x))
+     24 mostPopular = flipped.max()
+     25 mostPopularName = namesRdd.lookup(mostPopular[1])[0]
+     26 
+     27 print mostPopularName + " is the most popular superhero, with " + \
+     28     str(mostPopular[0]) + " co-appearances."
+
+```
+#####step-by-step
+- Map input data to (heroId, numberOfOccurrences) per line. read in the lines and map the count each co-occurence in each issue by split() words and then subtract one for the superhero id itself 
+```python
+      6 def countCoOccurences(line):
+      7     elements = line.split()
+      8     return (int(elements[0]), len(elements) - 1)
+      9 ...
+     13 
+     17 lines = sc.textFile("/vagrant/marvel-graph-sm.txt") 
+     18  
+     19 pairings = lines.map(countCoOccurences)
+     ```
+     will yield the superhero id and the count of associations for each line of the dataset
+     ```
+    (1742, 14)
+    (1743, 41)
+    (3308, 47)
+    (3309, 7)
+    (5494, 6)
+     ```
+     
+- Add up co-occurance by heroId using reduceByKey(). we know this function will groupby and count the total (occurences) 
+```python
+     21 totalFriendsByCharacter = pairings.reduceByKey(lambda x, y : x + y)
+```
+- Flip (map) RDD to (number, heroId). We need to flip the K and V. 
+```python
+     23 flipped = totalFriendsByCharacter.map(lambda (x,y) : (y,x))
+```
+- Use max() on the RDD to find the hero with the most co-occurences
+```python
+     24 mostPopular = flipped.max()
+```
+- Look up the name of the most popular 
+```python
+     25 mostPopularName = namesRdd.lookup(mostPopular[1])[0]
+```
+
